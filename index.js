@@ -3,8 +3,8 @@ const mqtt = require("mqtt");
 
 const config = require("./config.json");
 
-if (!config) {
-	throw new Error("Missing configuration");
+if (!config || !config.mqttBroker || !config.mqttTopicTraffic || !config.mqttTopicWeather) {
+	throw new Error("Missing configuration. Check config.json and config.json.example");
 }
 
 const RED = "rgba(255,0,0,1)";
@@ -120,7 +120,6 @@ async function render({traffic, weather}) {
 
 	ctx.fillStyle = BLACK;
 	ctx.fillText(weatherDetailsText, displayDimX - weatherDetailsTextWidth - 5, displayDimY - 20);
-	console.log(weatherDetailsText);
 	ctx.fillText(conditionsText, displayDimX - tempTextWidth - conditionsTextWidth - 10, displayDimY - 5);
 	ctx.fillStyle = RED;
 	ctx.fillText(tempText, displayDimX - tempTextWidth - 5, displayDimY - 5);
