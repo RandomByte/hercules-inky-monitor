@@ -46,6 +46,7 @@ displayInitPromise.then(loadFont).then(() => {
 
 	mqttClient.on("message", function(topic, message) {
 		if (busy) {
+			console.log("Busy! Ignoring new message...");
 			return;
 		}
 		switch (topic) {
@@ -87,7 +88,7 @@ async function handleTrafficMessage(message) {
 
 	const canvasPixels = ctx.getImageData(0, 0, displayDimX, displayDimY).data;
 
-	let posX = displayDimX;
+	let posX = 0;
 	let posY = displayDimY;
 	for (let i = 0; i < canvasPixels.length; i+=4) {
 		const r = canvasPixels[i];
@@ -101,9 +102,9 @@ async function handleTrafficMessage(message) {
 			color = inkyphat.BLACK;
 		}
 		inkyphat.setPixel(posX, posY, color);
-		posX--;
-		if (posX < 0) {
-			posX = displayDimX - 1;
+		posX++;
+		if (posX >= displayDimX) {
+			posX = 0;
 			posY--;
 			if (posY < 0 && i !== canvasPixels.length) {
 				throw new Error(`Y-position out of bounds: ${posX}x${posY}`);
