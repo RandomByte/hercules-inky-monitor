@@ -1,0 +1,19 @@
+# Template for hercules-inky-monitor systemd service (node supervisor needs to be installed)
+# 1. Place under /etc/systemd/system/hercules-inky-monitor.service
+# 2. Fill in working dir, user and group
+# 3. Run sudo systemctl enable hercules-inky-monitor
+# 4. Run sudo systemctl start hercules-inky-monitor
+# 5. Check the log by running sudo journalctl -f -u hercules-inky-monitor
+[Service]
+ExecStart=/usr/bin/supervisor -q -e json index.js
+WorkingDirectory=<working dir>
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=hercules-inky-monitor
+User=<user>
+Group=<group>
+
+[Install]
+WantedBy=multi-user.target

@@ -16,10 +16,25 @@ const displayDimY = 104;
 
 let displayInitPromise;
 let inkyphat;
+let busy = false;
 if (!config.simulation) {
 	inkyphat = require("inkyphat").getInstance();
 	displayInitPromise = inkyphat.init();
 } else {
+	inkyphat = {
+		pixels: [],
+		setPixel: function(x, y, color) {
+			this.pixels.push({
+				x,
+				y,
+				fillStyle: color === 1 ? BLACK : WHITE
+			});
+		},
+		redraw: async function() {},
+		WHITE: 0,
+		BLACK: 1,
+		RED: 2
+	};
 	displayInitPromise = Promise.resolve();
 }
 
@@ -30,9 +45,19 @@ displayInitPromise.then(loadFont).then(() => {
 	});
 
 	mqttClient.on("message", function(topic, message) {
+		if (busy) {
+			return;
+		}
 		switch (topic) {
 		case config.mqttTopicTraffic:
-			handleTrafficMessage(message); // async!
+			busy = true;
+			handleTrafficMessage(message).then(() => {
+				busy = false;
+			}, (err) => {
+				console.log("Error");
+				console.log(err);
+				busy = false;
+			});
 			break;
 		default:
 			console.log(`Received message for unknown topic '${topic}'`);
@@ -60,36 +85,45 @@ async function handleTrafficMessage(message) {
 	}
 
 
-	if (config.simulation) {
-		await writeImage(canvas);
-	} else {
-		const canvasPixels = ctx.getImageData(0, 0, displayDimX, displayDimY).data;
+	const canvasPixels = ctx.getImageData(0, 0, displayDimX, displayDimY).data;
 
-		let posY = 0;
-		let posX = 0;
-		for (let i = 0; i < canvasPixels.length; i+=4) {
-			const r = canvasPixels[i];
-			const g = canvasPixels[i + 1];
-			const b = canvasPixels[i + 2];
+	let posY = 0;
+	let posX = 0;
+	for (let i = 0; i < canvasPixels.length; i+=4) {
+		const r = canvasPixels[i];
+		const g = canvasPixels[i + 1];
+		const b = canvasPixels[i + 2];
 
-			let color;
-			if (r > 100 || g > 100 || b > 100) {
-				color = inkyphat.BLACK;
-			} else {
-				color = inkyphat.WHITE;
-			}
-			inkyphat.setPixel(posX, posY, color);
-			posX++;
-			if (posX > displayDimX) {
-				posX = 0;
-				posY++;
-				if (posY > displayDimY) {
-					console.log(`Y-position out of bounds: ${posX}x${posY}`);
-				}
+		let color;
+		if (r > 100 || g > 100 || b > 100) {
+			color = inkyphat.WHITE;
+		} else {
+			color = inkyphat.BLACK;
+		}
+		inkyphat.setPixel(posX, posY, color);
+		posX++;
+		if (posX >= displayDimX) {
+			posX = 0;
+			posY++;
+			if (posY > displayDimY) {
+				throw new Error(`Y-position out of bounds: ${posX}x${posY}`);
 			}
 		}
-		await inkyphat.redraw();
 	}
+	console.log("Drawing...");
+	await inkyphat.redraw();
+
+	if (config.simulation) {
+		const simCanvas = createCanvas(displayDimX, displayDimY);
+		const simCtx = simCanvas.getContext("2d");
+		for (let j = 0; j < inkyphat.pixels.length; j++) {
+			const {x, y, fillStyle} = inkyphat.pixels[j];
+			simCtx.fillStyle = fillStyle;
+			simCtx.fillRect(x, y, 1, 1);
+		}
+		await writeImage(simCanvas);
+	}
+
 }
 
 function loadFont() {
