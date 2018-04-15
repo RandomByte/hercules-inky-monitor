@@ -87,8 +87,8 @@ async function handleTrafficMessage(message) {
 
 	const canvasPixels = ctx.getImageData(0, 0, displayDimX, displayDimY).data;
 
-	let posY = 0;
-	let posX = 0;
+	let posY = displayDimX;
+	let posX = displayDimY;
 	for (let i = 0; i < canvasPixels.length; i+=4) {
 		const r = canvasPixels[i];
 		const g = canvasPixels[i + 1];
@@ -101,11 +101,11 @@ async function handleTrafficMessage(message) {
 			color = inkyphat.BLACK;
 		}
 		inkyphat.setPixel(posX, posY, color);
-		posX++;
-		if (posX >= displayDimX) {
+		posX--;
+		if (posX < 0) {
 			posX = 0;
-			posY++;
-			if (posY > displayDimY) {
+			posY--;
+			if (posY < 0) {
 				throw new Error(`Y-position out of bounds: ${posX}x${posY}`);
 			}
 		}
@@ -123,7 +123,6 @@ async function handleTrafficMessage(message) {
 		}
 		await writeImage(simCanvas);
 	}
-
 }
 
 function loadFont() {
