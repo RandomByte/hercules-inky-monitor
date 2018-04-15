@@ -1,0 +1,5 @@
+{
+	"simulation": false,
+	"mqttBroker": "mqtt://test.mosquitto.org",
+	"mqttTopicTraffic": "Home/WorkTraffic"
+}
