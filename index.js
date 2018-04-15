@@ -7,7 +7,7 @@ if (!config) {
 	throw new Error("Missing configuration");
 }
 
-// const RED = "rgba(255,0,0,1)";
+const RED = "rgba(255,0,0,1)";
 const BLACK = "rgba(0,0,0,1)";
 const WHITE = "rgba(255,255,255,1)";
 
@@ -16,7 +16,6 @@ const displayDimY = 104;
 
 let displayInitPromise;
 let inkyphat;
-let busy = false;
 if (!config.simulation) {
 	inkyphat = require("inkyphat").getInstance();
 	displayInitPromise = inkyphat.init();
@@ -27,7 +26,7 @@ if (!config.simulation) {
 			this.pixels.push({
 				x,
 				y,
-				fillStyle: color === 1 ? BLACK : WHITE
+				fillStyle: color === 0 ? WHITE : (color === 1 ? BLACK : RED)
 			});
 		},
 		redraw: async function() {},
@@ -42,7 +41,12 @@ displayInitPromise.then(loadFont).then(() => {
 	const mqttClient = mqtt.connect(config.mqttBroker);
 	mqttClient.on("connect", function() {
 		mqttClient.subscribe(config.mqttTopicTraffic);
+		mqttClient.subscribe(config.mqttTopicWeather);
 	});
+
+	let busy = false;
+	let lastTrafficData;
+	let lastWeatherData;
 
 	mqttClient.on("message", function(topic, message) {
 		if (busy) {
@@ -52,7 +56,19 @@ displayInitPromise.then(loadFont).then(() => {
 		switch (topic) {
 		case config.mqttTopicTraffic:
 			busy = true;
-			handleTrafficMessage(message).then(() => {
+			lastTrafficData = JSON.parse(message);
+			render({traffic: lastTrafficData, weather: lastWeatherData}).then(() => {
+				busy = false;
+			}, (err) => {
+				console.log("Error");
+				console.log(err);
+				busy = false;
+			});
+			break;
+		case config.mqttTopicWeather:
+			busy = true;
+			lastWeatherData = JSON.parse(message);
+			render({traffic: lastTrafficData, weather: lastWeatherData}).then(() => {
 				busy = false;
 			}, (err) => {
 				console.log("Error");
@@ -62,41 +78,69 @@ displayInitPromise.then(loadFont).then(() => {
 			break;
 		default:
 			console.log(`Received message for unknown topic '${topic}'`);
+			break;
 		}
 	});
 });
 
-async function handleTrafficMessage(message) {
-	const trafficData = JSON.parse(message);
+async function render({traffic, weather}) {
+	if (!traffic || !weather) {
+		console.log("Waiting for more data...");
+		return;
+	}
+	console.log(traffic);
+	console.log(weather);
 
+	/*
+		Render into canvas
+	*/
 	const canvas = createCanvas(displayDimX, displayDimY);
 	const ctx = canvas.getContext("2d");
 	ctx.fillStyle = WHITE;
 	ctx.fillRect(0, 0, displayDimX, displayDimY);
-	ctx.fillStyle = BLACK;
 
+	// Traffic
 	ctx.font = "10px 'NotoSans'";
-	console.log(trafficData);
+	ctx.fillStyle = BLACK;
 	let nextTextPositionY = 20;
-	for (let routeSummary in trafficData) {
-		if (trafficData.hasOwnProperty(routeSummary)) {
-			ctx.fillText(`${routeSummary}: ${trafficData[routeSummary].duration}min`, 10, nextTextPositionY);
+	for (let routeSummary in traffic) {
+		if (traffic.hasOwnProperty(routeSummary)) {
+			ctx.fillText(`${routeSummary}: ${traffic[routeSummary].duration}min`, 10, nextTextPositionY);
 			nextTextPositionY += 15;
 		}
 	}
 
+	// Weather
+	const weatherDetailsText = `(H${weather.temperature.high}/L${weather.temperature.low}/${weather.humidity}%)`;
+	const weatherDetailsTextWidth = ctx.measureText(weatherDetailsText).width;
+	const conditionsText = weather.conditions;
+	const conditionsTextWidth = ctx.measureText(conditionsText).width;
+	const tempText = `${weather.temperature.current} °C`;
+	const tempTextWidth = ctx.measureText(tempText).width;
 
+	ctx.fillStyle = BLACK;
+	ctx.fillText(weatherDetailsText, displayDimX - weatherDetailsTextWidth - 5, displayDimY - 20);
+	console.log(weatherDetailsText);
+	ctx.fillText(conditionsText, displayDimX - tempTextWidth - conditionsTextWidth - 10, displayDimY - 5);
+	ctx.fillStyle = RED;
+	ctx.fillText(tempText, displayDimX - tempTextWidth - 5, displayDimY - 5);
+
+	/*
+		Transfer canvas pixels to inky pixels
+	*/
 	const canvasPixels = ctx.getImageData(0, 0, displayDimX, displayDimY).data;
 
 	let posX = 0;
-	let posY = displayDimY;
+	let posY = displayDimY; // Y axis needs to be mirrored. Maybe because of the inkyphat library
 	for (let i = 0; i < canvasPixels.length; i+=4) {
 		const r = canvasPixels[i];
 		const g = canvasPixels[i + 1];
 		const b = canvasPixels[i + 2];
 
 		let color;
-		if (r > 100 || g > 100 || b > 100) {
+		if (r > 100 && g < 100 && b < 100) {
+			color = inkyphat.RED;
+		} else if (r > 100 || g > 100 || b > 100) {
 			color = inkyphat.WHITE;
 		} else {
 			color = inkyphat.BLACK;

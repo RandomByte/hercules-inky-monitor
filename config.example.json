@@ -1,5 +1,6 @@
 {
 	"simulation": false,
 	"mqttBroker": "mqtt://test.mosquitto.org",
-	"mqttTopicTraffic": "Home/WorkTraffic"
+	"mqttTopicTraffic": "Home/WorkTraffic",
+	"mqttTopicWeather": "Home/Weather"
 }
