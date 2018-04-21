@@ -55,10 +55,19 @@ displayInitPromise.then(loadFont).then(() => {
 		}
 		switch (topic) {
 		case config.mqttTopicTraffic:
-			busy = true;
 			lastTrafficData = JSON.parse(message);
+
+			if (!lastWeatherData) {
+				console.log("Got traffic data. Waiting for new weather data...");
+				break;
+			}
+			busy = true;
 			render({traffic: lastTrafficData, weather: lastWeatherData}).then(() => {
 				busy = false;
+
+				// Resetting data so next rendering will only happen if both got updated
+				lastTrafficData = null;
+				lastWeatherData = null;
 			}, (err) => {
 				console.log("Error");
 				console.log(err);
@@ -66,10 +75,19 @@ displayInitPromise.then(loadFont).then(() => {
 			});
 			break;
 		case config.mqttTopicWeather:
-			busy = true;
 			lastWeatherData = JSON.parse(message);
+
+			if (!lastTrafficData) {
+				console.log("Got weather data. Waiting for new traffic data...");
+				break;
+			}
+			busy = true;
 			render({traffic: lastTrafficData, weather: lastWeatherData}).then(() => {
 				busy = false;
+
+				// Resetting data so next rendering will only happen if both got updated
+				lastTrafficData = null;
+				lastWeatherData = null;
 			}, (err) => {
 				console.log("Error");
 				console.log(err);
@@ -84,10 +102,6 @@ displayInitPromise.then(loadFont).then(() => {
 });
 
 async function render({traffic, weather}) {
-	if (!traffic || !weather) {
-		console.log("Waiting for more data...");
-		return;
-	}
 	console.log(traffic);
 	console.log(weather);
 
