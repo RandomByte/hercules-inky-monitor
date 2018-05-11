@@ -53,52 +53,50 @@ displayInitPromise.then(loadFont).then(() => {
 			console.log("Busy! Ignoring new message...");
 			return;
 		}
+		let newTrafficData;
+		let newWeatherData;
+
 		switch (topic) {
 		case config.mqttTopicTraffic:
-			lastTrafficData = JSON.parse(message);
-
-			if (!lastWeatherData) {
-				console.log("Got traffic data. Waiting for new weather data...");
+			newTrafficData = JSON.parse(message);
+			if (JSON.stringify(lastTrafficData) === JSON.stringify(newTrafficData)) {
+				console.log("Traffic data didn't change. Ignoring message.");
 				break;
 			}
-			busy = true;
-			render({traffic: lastTrafficData, weather: lastWeatherData}).then(() => {
-				busy = false;
-
-				// Resetting data so next rendering will only happen if both got updated
-				lastTrafficData = null;
-				lastWeatherData = null;
-			}, (err) => {
-				console.log("Error");
-				console.log(err);
-				busy = false;
-			});
+			console.log("Got new traffic data");
+			lastTrafficData = newTrafficData;
+			renderData();
 			break;
 		case config.mqttTopicWeather:
-			lastWeatherData = JSON.parse(message);
-
-			if (!lastTrafficData) {
-				console.log("Got weather data. Waiting for new traffic data...");
+			newWeatherData = JSON.parse(message);
+			if (JSON.stringify(lastWeatherData) === JSON.stringify(newWeatherData)) {
+				console.log("Weather data didn't change. Ignoring message.");
 				break;
 			}
-			busy = true;
-			render({traffic: lastTrafficData, weather: lastWeatherData}).then(() => {
-				busy = false;
-
-				// Resetting data so next rendering will only happen if both got updated
-				lastTrafficData = null;
-				lastWeatherData = null;
-			}, (err) => {
-				console.log("Error");
-				console.log(err);
-				busy = false;
-			});
+			console.log("Got new weather data");
+			lastWeatherData = newWeatherData;
+			renderData();
 			break;
 		default:
 			console.log(`Received message for unknown topic '${topic}'`);
 			break;
 		}
 	});
+
+	function renderData() {
+		if (!lastTrafficData || !lastWeatherData) {
+			console.log("Waiting for more data...");
+			return;
+		}
+		busy = true;
+		render({traffic: lastTrafficData, weather: lastWeatherData}).then(() => {
+			busy = false;
+		}, (err) => {
+			console.log("Error");
+			console.log(err);
+			busy = false;
+		});
+	}
 });
 
 async function render({traffic, weather}) {
